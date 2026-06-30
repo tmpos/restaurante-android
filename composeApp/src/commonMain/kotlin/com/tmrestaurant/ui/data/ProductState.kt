@@ -59,6 +59,16 @@ class ProductState {
         scheduleSave()
     }
 
+    fun clearAll() {
+        if (!AccessControl.canManageCatalog(TurnoManager.currentUser)) {
+            AuditLogManager.log("Seguridad", "DENEGAR_PRODUCTO_VACIAR", "Acceso denegado para vaciar productos", level = "WARN")
+            return
+        }
+        products = emptyList()
+        invalidatePosCache()
+        scheduleSave()
+    }
+
     fun getPosProducts(): List<Product> {
         val current = products
         if (cachedPosProducts == null || cachedProductsRef !== current) {

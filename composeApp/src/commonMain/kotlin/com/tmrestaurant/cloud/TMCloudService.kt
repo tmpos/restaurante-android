@@ -129,23 +129,84 @@ object TMCloudService {
     }
 
     private suspend fun parseTableResponse(tableName: String, body: String): SyncResult {
+        println("TMCloud DEBUG: body (first 600 chars): ${body.take(600)}")
         val records = parseJsonArrayFromBody(body, tableName)
+        println("TMCloud DEBUG: parsed ${records.size} records for $tableName")
+        if (records.isNotEmpty()) {
+            println("TMCloud DEBUG: first record keys: ${records.first().keys}")
+            println("TMCloud DEBUG: first record values: ${records.first().mapValues { (k, v) -> if (v.length > 100) v.take(100) + "..." else v }}")
+        }
         if (records.isEmpty()) return SyncResult(true, "$tableName: sin cambios", 0, responseBody = body)
-        val applied = applyTableData(tableName, records)
+        val imageResult = if (tableName == "productos") downloadProductImages(records)
+            else ImageDownloadResult(records, 0, 0)
+        val applied = applyTableData(tableName, imageResult.records)
         lastSyncTimestamps[tableName] = System.currentTimeMillis()
         saveSyncState()
-        return SyncResult(true, "$tableName: $applied aplicados", inserts = applied, responseBody = body)
+        val imageMessage = if (tableName == "productos") ", ${imageResult.downloaded} imagenes" else ""
+        val errorMessage = if (imageResult.errors > 0) ", ${imageResult.errors} imagenes con error" else ""
+        return SyncResult(
+            imageResult.errors == 0,
+            "$tableName: $applied aplicados$imageMessage$errorMessage",
+            inserts = applied,
+            errors = imageResult.errors,
+            responseBody = body
+        )
+    }
+
+    private data class ImageDownloadResult(
+        val records: List<Map<String, String>>,
+        val downloaded: Int,
+        val errors: Int
+    )
+
+    private suspend fun downloadProductImages(records: List<Map<String, String>>): ImageDownloadResult {
+        var downloaded = 0
+        var errors = 0
+        val token = config.publicKey.ifBlank { config.secretKey }
+        val prepared = records.map { record ->
+            val mutable = record.toMutableMap()
+            val remoteUrl = record["imagen"] ?: record["image"] ?: record["foto"]
+            if (!remoteUrl.isNullOrBlank() && remoteUrl.startsWith("http", ignoreCase = true)) {
+                val response = client.getBytes(remoteUrl, token)
+                if (response.ok && response.bytes.isNotEmpty()) {
+                    val uid = (record["uid"] ?: remoteUrl.substringAfterLast('/')).replace(Regex("[^A-Za-z0-9_-]"), "_")
+                    val extension = when {
+                        response.contentType?.contains("png", true) == true -> "png"
+                        response.contentType?.contains("webp", true) == true -> "webp"
+                        response.contentType?.contains("gif", true) == true -> "gif"
+                        else -> "jpg"
+                    }
+                    val localName = "cloud_${uid}.$extension"
+                    PersistentFiles.writeBytes("img_$localName", response.bytes)
+                    mutable["imagen"] = localName
+                    downloaded++
+                } else {
+                    mutable.remove("imagen")
+                    mutable.remove("image")
+                    mutable.remove("foto")
+                    errors++
+                }
+            }
+            mutable
+        }
+        return ImageDownloadResult(prepared, downloaded, errors)
     }
 
     private fun parseJsonArrayFromBody(body: String, tableName: String): List<Map<String, String>> {
         val trimmed = body.trim()
         if (trimmed.startsWith("[")) return parseJsonArray(trimmed)
-        for (key in listOf("\"data\":", "\"${tableName}\":", "\"records\":", "\"rows\":")) {
-            val idx = body.indexOf(key)
-            if (idx >= 0) {
-                val jsonData = body.substring(idx + key.length).trimStart()
-                val records = parseJsonArray(jsonData)
-                if (records.isNotEmpty()) return records
+        for (key in listOf("data", tableName, "records", "rows")) {
+            val keyStr = "\"$key\""
+            var idx = body.indexOf(keyStr)
+            while (idx >= 0) {
+                val afterKey = idx + keyStr.length
+                val colonIdx = body.indexOf(':', afterKey)
+                if (colonIdx >= 0 && body.substring(afterKey, colonIdx).all { it.isWhitespace() }) {
+                    val jsonData = body.substring(colonIdx + 1).trimStart()
+                    val records = parseJsonArray(jsonData)
+                    if (records.isNotEmpty()) return records
+                }
+                idx = body.indexOf(keyStr, idx + 1)
             }
         }
         val braceIdx = trimmed.indexOf('{')
@@ -281,26 +342,70 @@ object TMCloudService {
     }
 
     private fun findMatchingBrace(json: String, start: Int): Int {
+        val open = json[start]
+        if (open != '{' && open != '[') return -1
+        val close = if (open == '{') '}' else ']'
         var depth = 0
         var inStr = false
         for (i in start until json.length) {
             val ch = json[i]
             if (ch == '"' && (i == 0 || json[i-1] != '\\')) inStr = !inStr
             if (!inStr) {
-                when (ch) { '{' -> depth++; '}' -> { depth--; if (depth == 0) return i } }
+                when (ch) { open -> depth++; close -> { depth--; if (depth == 0) return i } }
             }
         }
         return -1
     }
 
     private fun parseJsonObject(json: String): Map<String, String> {
+        println("TMCloud DEBUG parseJsonObject input (first 300): ${json.take(300)}")
         val map = mutableMapOf<String, String>()
-        val regex = "\"([^\"]+)\"\\s*:\\s*((\"([^\"]*)\")|([0-9]+(\\.[0-9]+)?)|(true|false|null))".toRegex()
-        regex.findAll(json).forEach { m ->
-            val key = m.groupValues[1]
-            val value = m.groupValues[4].ifEmpty { m.groupValues[5].ifEmpty { m.groupValues[7] } }
+        var i = 0
+        while (i < json.length) {
+            if (json[i] != '"') { i++; continue }
+            val keyStart = i + 1
+            i = json.indexOf('"', keyStart)
+            if (i < 0) break
+            val key = json.substring(keyStart, i)
+            i++
+            while (i < json.length && json[i] != ':') i++
+            if (i >= json.length) break
+            i++
+            while (i < json.length && json[i].isWhitespace()) i++
+            if (i >= json.length) break
+            val ch = json[i]
+            val value: String = when {
+                ch == '"' -> {
+                    i++
+                    val sb = StringBuilder()
+                    while (i < json.length) {
+                        when (json[i]) {
+                            '\\' -> { i++; if (i < json.length) { sb.append(json[i]); i++ } }
+                            '"' -> { i++; break }
+                            else -> { sb.append(json[i]); i++ }
+                        }
+                    }
+                    sb.toString()
+                }
+                ch == '{' || ch == '[' -> {
+                    val end = findMatchingBrace(json, i)
+                    if (end > i) {
+                        val v = json.substring(i, end + 1)
+                        i = end + 1
+                        v
+                    } else { i++; "" }
+                }
+                else -> {
+                    val start = i
+                    while (i < json.length && json[i] !in charArrayOf(',', '}', ']')) i++
+                    json.substring(start, i).trim()
+                }
+            }
             map[key] = value
         }
+        println("TMCloud DEBUG parseJsonObject result keys: ${map.keys}")
+        if (map.containsKey("precio")) println("TMCloud DEBUG   precio=${map["precio"]}")
+        if (map.containsKey("categoria")) println("TMCloud DEBUG   categoria=${map["categoria"]}")
         return map
     }
 
@@ -317,11 +422,20 @@ object TMCloudService {
                     val product = Product(
                         id = existing?.id ?: (products.maxOfOrNull { it.id } ?: 0) + 1,
                         uid = uid, name = rec["nombre"] ?: "", code = rec["codigo"] ?: "",
-                        barcode = rec["barcode"] ?: "", category = rec["categoria"] ?: "",
-                        description = rec["descripcion"] ?: "", price = parseDouble(rec["precio"]),
-                        cost = parseDouble(rec["costo"]), taxPercent = parseDouble(rec["impuesto"]),
-                        stock = parseInt(rec["stock"]), stockAlert = parseInt(rec["alerta"]),
-                        active = rec["activo"] != "0", sellInPos = true
+                        barcode = rec["barcode"] ?: rec["codigo_barra"] ?: "",
+                        category = parseNestedString(rec["categoria"]) ?: rec["categoria_id"] ?: "",
+                        description = rec["descripcion"] ?: "",
+                        price = parseDouble(rec["precio"] ?: rec["precio_venta"]),
+                        cost = parseDouble(rec["costo"] ?: rec["precio_costo"]), taxPercent = parseDouble(rec["impuesto"]),
+                        stock = parseInt(rec["stock"] ?: rec["stock_actual"]),
+                        stockAlert = parseInt(rec["alerta"] ?: rec["stock_minimo"]),
+                        imagePath = rec["imagen"] ?: existing?.imagePath,
+                        active = rec["activo"] != "0",
+                        sellInPos = (rec["enable_pos"] ?: rec["vendible"]) != "0",
+                        sendToKitchen = rec["para_cocina"] != "0",
+                        sendToBar = (rec["send_bar"] ?: rec["para_bar"]) != "0",
+                        controlInventory = rec["control_inventario"] == "1",
+                        favorite = rec["favorito"] == "1"
                     )
                     if (existing != null) {
                         val idx = products.indexOfFirst { it.uid == uid }
@@ -481,6 +595,13 @@ object TMCloudService {
     private fun parseDouble(value: String?): Double = value?.toDoubleOrNull() ?: 0.0
     private fun parseInt(value: String?): Int = value?.toIntOrNull() ?: 0
     private fun parseLong(value: String?): Long = value?.toLongOrNull() ?: System.currentTimeMillis()
+    private fun parseNestedString(value: String?): String? {
+        if (value == null) return null
+        val trimmed = value.trim()
+        if (!trimmed.startsWith("{")) return value
+        val regex = "\"(nombre|name|label|title)\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+        return regex.find(trimmed)?.groupValues?.getOrNull(2) ?: value
+    }
 
     private fun extractJson(json: String, key: String): String? {
         val regex = "\"$key\"\\s*:\\s*\"?([^\",}]+)\"?".toRegex()
@@ -492,6 +613,7 @@ object TMCloudService {
             ColumnDef("uid", "TEXT"), ColumnDef("nombre", "TEXT"), ColumnDef("codigo", "TEXT"),
             ColumnDef("barcode", "TEXT"), ColumnDef("categoria", "TEXT"), ColumnDef("descripcion", "TEXT"),
             ColumnDef("precio", "REAL"), ColumnDef("costo", "REAL"), ColumnDef("impuesto", "REAL"),
+            ColumnDef("imagen", "IMAGE"),
             ColumnDef("stock", "INTEGER"), ColumnDef("alerta", "INTEGER"), ColumnDef("activo", "INTEGER"),
             ColumnDef("enable_pos", "INTEGER"), ColumnDef("send_bar", "INTEGER"),
             ColumnDef("created_at", "DATETIME"), ColumnDef("updated_at", "DATETIME"),
@@ -571,6 +693,7 @@ object TMCloudService {
         "productos" -> (AppPersistence.loadProducts() ?: emptyList()).map { mapOf(
             "uid" to it.uid, "nombre" to it.name, "codigo" to it.code, "barcode" to it.barcode,
             "categoria" to it.category, "descripcion" to it.description,
+            "imagen" to it.imagePath.orEmpty(),
             "precio" to it.price.toString(), "costo" to it.cost.toString(),
             "impuesto" to it.taxPercent.toString(), "stock" to it.stock.toString(),
             "alerta" to it.stockAlert.toString(), "activo" to (if (it.active) 1 else 0).toString(),

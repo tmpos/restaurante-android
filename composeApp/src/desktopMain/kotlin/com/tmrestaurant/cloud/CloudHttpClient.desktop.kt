@@ -24,6 +24,22 @@ actual class CloudHttpClient actual constructor() {
         }.getOrElse { CloudHttpResponse(-1, it.message ?: "Error de red", false) }
     }
 
+    actual suspend fun getBytes(path: String, bearerToken: String, headers: Map<String, String>): CloudBinaryResponse = withContext(Dispatchers.IO) {
+        runCatching {
+            val conn = URL(path).openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("Authorization", "Bearer $bearerToken")
+            conn.setRequestProperty("apikey", bearerToken)
+            conn.setRequestProperty("Accept", "image/*,application/octet-stream")
+            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            CloudBinaryResponse(code, stream?.use { it.readBytes() } ?: ByteArray(0), conn.contentType)
+        }.getOrElse { CloudBinaryResponse(-1, ByteArray(0), null, false) }
+    }
+
     actual suspend fun post(path: String, bearerToken: String, body: String, headers: Map<String, String>): CloudHttpResponse = withContext(Dispatchers.IO) {
         runCatching {
             val url = URL(path)

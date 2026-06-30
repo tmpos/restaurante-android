@@ -27,12 +27,13 @@ Sistema POS para restaurantes desarrollado en **Kotlin Multiplatform** (Android 
 
 ## Descargas
 
-[Download v2.1](https://github.com/tmpos/restaurante-android/releases/download/v2.1/TMRestaurant-v2.1.apk)
+[Download v2.2](https://github.com/tmpos/restaurante-android/releases/download/v2.2/TMRestaurant-v2.2.apk)
 
 ## Versiones
 
 | Versión | Cambios |
 |---------|---------|
+| 2.2 | Corrección parser JSON TM Cloud (price/category), botón descarga directa en Productos, confirmación Vaciar tabla |
 | 2.1 | Corrección multi-compañía Alanube (GET /company/{id}) |
 | 2.0 | Integración Alanube DGII (E31-E45) |
 | 1.0 | Versión inicial |

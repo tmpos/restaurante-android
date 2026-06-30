@@ -18,16 +18,22 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.ViewList
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,11 +42,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tmrestaurant.cloud.TMCloudService
 import com.tmrestaurant.ui.components.DangerButton
 import com.tmrestaurant.ui.components.IconButtonBox
-import com.tmrestaurant.ui.data.LocalProductState
 import com.tmrestaurant.ui.components.PrimaryButton
 import com.tmrestaurant.ui.components.ProductCardAdmin
+import com.tmrestaurant.ui.components.SecondaryButton
+import com.tmrestaurant.ui.data.LocalProductState
+import kotlinx.coroutines.launch
 import com.tmrestaurant.ui.components.ProductFormModal
 import com.tmrestaurant.ui.components.SearchInput
 import com.tmrestaurant.ui.data.AccessControl
@@ -61,6 +70,10 @@ fun ProductsScreen() {
     var isGridView by remember { mutableStateOf(true) }
     var showForm by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<Int?>(null) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var downloadingCloud by remember { mutableStateOf(false) }
+    var cloudMsg by remember { mutableStateOf<String?>(null) }
 
     val products = productState.products
 
@@ -76,7 +89,25 @@ fun ProductsScreen() {
                 Text("${products.size} productos registrados", color = AppColors.TextSecondary, fontSize = 14.sp)
             }
             Spacer(Modifier.weight(1f))
-            DangerButton(text = "Vaciar tabla", icon = Icons.Outlined.Delete, onClick = { })
+            if (cloudMsg != null) {
+                Text(cloudMsg!!, color = if (cloudMsg?.contains("Error") == true) AppColors.Danger else Color(0xFF16A34A), fontSize = 12.sp, modifier = Modifier.padding(end = 10.dp))
+            }
+            SecondaryButton(
+                text = if (downloadingCloud) "Descargando..." else "TM Cloud",
+                icon = Icons.Outlined.CloudDownload,
+                onClick = {
+                    scope.launch {
+                        downloadingCloud = true; cloudMsg = null
+                        TMCloudService.loadSavedConfig()
+                        val res = TMCloudService.pullTable("productos")
+                        productState.reload()
+                        cloudMsg = res.message
+                        downloadingCloud = false
+                    }
+                }
+            )
+            Spacer(Modifier.width(10.dp))
+            DangerButton(text = "Vaciar tabla", icon = Icons.Outlined.Delete, onClick = { showClearConfirm = true })
             Spacer(Modifier.width(10.dp))
             PrimaryButton(
                 text = "+ Nuevo Producto",
@@ -135,6 +166,23 @@ fun ProductsScreen() {
                 }
             }
         }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("Vaciar tabla") },
+            text = { Text("Se eliminaran TODOS los productos. Esta accion no se puede deshacer.") },
+            confirmButton = {
+                Button(
+                    onClick = { productState.clearAll(); showClearConfirm = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Danger)
+                ) { Text("Vaciar tabla") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showClearConfirm = false }) { Text("Cancelar") }
+            }
+        )
     }
 
     if (showForm) {
