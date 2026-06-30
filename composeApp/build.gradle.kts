@@ -49,8 +49,8 @@ android {
         applicationId = "com.tmrestaurant"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "2.1"
     }
 
     compileOptions {
@@ -76,7 +76,7 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe
             )
             packageName = "TMRestaurant"
-            packageVersion = "2.0.0"
+            packageVersion = "2.1.0"
         }
     }
 }
