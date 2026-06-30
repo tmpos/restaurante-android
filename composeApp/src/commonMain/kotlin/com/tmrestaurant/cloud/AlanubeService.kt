@@ -99,7 +99,7 @@ object AlanubeService {
             val res = client.post("${getBaseUrl()}/invoices", config.jwtToken, body)
             val docId = extractJsonValue(res.body, "id")
             val legalStatus = extractJsonValue(res.body, "legalStatus")
-            AlanubeResult(
+            val result = AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Factura emitida exitosamente" else "Error ${res.code}",
                 statusCode = res.code,
@@ -107,7 +107,20 @@ object AlanubeService {
                 documentId = docId,
                 legalStatus = legalStatus
             )
+            saveEmission("32", encf, total, result)
+            result
         }.getOrElse { AlanubeResult(false, it.message ?: "Error de red") }
+    }
+
+    private fun saveEmission(docType: String, encf: String, total: Double, result: AlanubeResult) {
+        val now = com.tmrestaurant.platform.localDateTimeLabel()
+        AlanubeEmissionStore.add(
+            AlanubeEmissionRecord(
+                timestamp = now, docType = docType, encf = encf, total = total.toString(),
+                documentId = result.documentId ?: "", legalStatus = result.legalStatus ?: "",
+                success = result.success, responseBody = result.responseBody.take(500)
+            )
+        )
     }
 
     suspend fun emitCreditFiscalInvoice(
@@ -157,7 +170,7 @@ object AlanubeService {
             val res = client.post("${getBaseUrl()}/fiscal-invoices", config.jwtToken, body)
             val docId = extractJsonValue(res.body, "id")
             val legalStatus = extractJsonValue(res.body, "legalStatus")
-            AlanubeResult(
+            val result = AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Factura emitida exitosamente" else "Error ${res.code}",
                 statusCode = res.code,
@@ -165,6 +178,8 @@ object AlanubeService {
                 documentId = docId,
                 legalStatus = legalStatus
             )
+            saveEmission("31", encf, total, result)
+            result
         }.getOrElse { AlanubeResult(false, it.message ?: "Error de red") }
     }
 
@@ -236,14 +251,18 @@ object AlanubeService {
 
         return runCatching {
             val res = client.post("${getBaseUrl()}/gubernamental-invoices", config.jwtToken, body)
-            AlanubeResult(
+            val docId = extractJsonValue(res.body, "id")
+            val legalStatus = extractJsonValue(res.body, "legalStatus")
+            val result = AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Factura gubernamental emitida" else "Error ${res.code}",
                 statusCode = res.code,
                 responseBody = formatJson(res.body),
-                documentId = extractJsonValue(res.body, "id"),
-                legalStatus = extractJsonValue(res.body, "legalStatus")
+                documentId = docId,
+                legalStatus = legalStatus
             )
+            saveEmission("45", encf, total, result)
+            result
         }.getOrElse { AlanubeResult(false, it.message ?: "Error de red") }
     }
 
@@ -282,14 +301,18 @@ object AlanubeService {
 
         return runCatching {
             val res = client.post("${getBaseUrl()}/credit-notes", config.jwtToken, body)
-            AlanubeResult(
+            val docId = extractJsonValue(res.body, "id")
+            val legalStatus = extractJsonValue(res.body, "legalStatus")
+            val result = AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Nota de credito emitida" else "Error ${res.code}",
                 statusCode = res.code,
                 responseBody = formatJson(res.body),
-                documentId = extractJsonValue(res.body, "id"),
-                legalStatus = extractJsonValue(res.body, "legalStatus")
+                documentId = docId,
+                legalStatus = legalStatus
             )
+            saveEmission("34", encf, total, result)
+            result
         }.getOrElse { AlanubeResult(false, it.message ?: "Error de red") }
     }
 
@@ -328,14 +351,18 @@ object AlanubeService {
 
         return runCatching {
             val res = client.post("${getBaseUrl()}/debit-notes", config.jwtToken, body)
-            AlanubeResult(
+            val docId = extractJsonValue(res.body, "id")
+            val legalStatus = extractJsonValue(res.body, "legalStatus")
+            val result = AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Nota de debito emitida" else "Error ${res.code}",
                 statusCode = res.code,
                 responseBody = formatJson(res.body),
-                documentId = extractJsonValue(res.body, "id"),
-                legalStatus = extractJsonValue(res.body, "legalStatus")
+                documentId = docId,
+                legalStatus = legalStatus
             )
+            saveEmission("33", encf, total, result)
+            result
         }.getOrElse { AlanubeResult(false, it.message ?: "Error de red") }
     }
 

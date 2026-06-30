@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Lock
@@ -102,6 +103,8 @@ import com.tmrestaurant.ui.data.settings.BackupItem
 import com.tmrestaurant.ui.data.settings.LocalSettingsState
 import com.tmrestaurant.cloud.AlanubeConfig
 import com.tmrestaurant.cloud.AlanubeConfigStore
+import com.tmrestaurant.cloud.AlanubeEmissionRecord
+import com.tmrestaurant.cloud.AlanubeEmissionStore
 import com.tmrestaurant.cloud.AlanubeEnvironment
 import com.tmrestaurant.cloud.AlanubeResult
 import com.tmrestaurant.cloud.AlanubeService
@@ -3232,6 +3235,9 @@ private fun AlanubeSection() {
     var address by remember { mutableStateOf(initial.address) }
     var stampDate by remember { mutableStateOf(initial.stampDate) }
 
+    var records by remember { mutableStateOf(AlanubeEmissionStore.load()) }
+    var showHistory by remember { mutableStateOf(false) }
+
     var status by remember { mutableStateOf<AlanubeStatus?>(null) }
     var result by remember { mutableStateOf<AlanubeResult?>(null) }
     var loading by remember { mutableStateOf("") }
@@ -3348,6 +3354,52 @@ private fun AlanubeSection() {
                                 Text(res.responseBody, fontSize = 9.sp, color = AppColors.TextSecondary)
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    SectionCard("Historial de Emisiones", "${records.size} comprobante(s) enviado(s)", Icons.Outlined.History) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("${records.size} registros", fontSize = 12.sp, color = AppColors.TextSecondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (records.isNotEmpty()) {
+                    AlanubeButton("Limpiar", Icons.Outlined.Delete, false, Modifier, Color(0xFFEF4444), true) {
+                        AlanubeEmissionStore.saveAll(emptyList())
+                        records = emptyList()
+                    }
+                }
+                AlanubeButton(if (showHistory) "Ocultar" else "Ver historial", if (showHistory) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, false, Modifier, Color(0xFF0891B2), true) {
+                    showHistory = !showHistory
+                }
+            }
+        }
+        if (showHistory && records.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(AppColors.Background)) {
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    item {
+                        Row(Modifier.fillMaxWidth().background(Color(0xFFE5E7EB)).padding(horizontal = 8.dp, vertical = 6.dp)) {
+                            Text("Fecha", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.25f))
+                            Text("Tipo", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.1f))
+                            Text("e-NCF", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.2f))
+                            Text("Total", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.12f))
+                            Text("Estado", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.2f))
+                            Text("ID", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.13f))
+                        }
+                    }
+                    items(records) { rec ->
+                        val bgColor = if (rec.success) Color.Transparent else Color(0xFFFFF5F5)
+                        Row(Modifier.fillMaxWidth().background(bgColor).padding(horizontal = 8.dp, vertical = 5.dp)) {
+                            Text(rec.timestamp.take(10), fontSize = 9.sp, color = AppColors.TextSecondary, modifier = Modifier.weight(0.25f))
+                            Text("E${rec.docType}", fontSize = 9.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(0.1f))
+                            Text(rec.encf, fontSize = 9.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(0.2f))
+                            Text(rec.total, fontSize = 9.sp, color = AppColors.TextPrimary, modifier = Modifier.weight(0.12f))
+                            Text(rec.legalStatus.replace("_", " ").take(20), fontSize = 8.sp, color = if (rec.success) Color(0xFF16A34A) else Color(0xFFEF4444), modifier = Modifier.weight(0.2f))
+                            Text(rec.documentId.take(12), fontSize = 8.sp, color = AppColors.TextSecondary, modifier = Modifier.weight(0.13f))
+                        }
+                        Box(Modifier.fillMaxWidth().height(0.5.dp).background(AppColors.DividerColor))
                     }
                 }
             }
