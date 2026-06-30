@@ -19,13 +19,16 @@ object AlanubeService {
 
     fun getBaseUrl(): String = config.environment.baseUrl
 
+    private fun companyUrl(): String =
+        if (config.companyId.isNotBlank()) "${getBaseUrl()}/company/${config.companyId}" else "${getBaseUrl()}/company"
+
     private fun urlWithCompany(path: String): String =
         if (config.companyId.isNotBlank()) "$path?idCompany=${config.companyId}" else path
 
     suspend fun testConnection(): AlanubeStatus {
         if (config.jwtToken.isBlank()) return AlanubeStatus(false, error = "JWT token requerido")
         return runCatching {
-            val res = client.get(urlWithCompany("${getBaseUrl()}/company"), config.jwtToken)
+            val res = client.get(companyUrl(), config.jwtToken)
             if (!res.ok) {
                 return@runCatching AlanubeStatus(
                     false,
@@ -43,7 +46,7 @@ object AlanubeService {
     suspend fun getCompanyInfo(): AlanubeResult {
         if (config.jwtToken.isBlank()) return AlanubeResult(false, "JWT token requerido")
         return runCatching {
-            val res = client.get(urlWithCompany("${getBaseUrl()}/company"), config.jwtToken)
+            val res = client.get(companyUrl(), config.jwtToken)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Informacion obtenida" else "Error ${res.code}",
