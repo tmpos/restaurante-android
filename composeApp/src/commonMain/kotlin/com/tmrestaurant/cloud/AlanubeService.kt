@@ -19,10 +19,13 @@ object AlanubeService {
 
     fun getBaseUrl(): String = config.environment.baseUrl
 
+    private fun urlWithCompany(path: String): String =
+        if (config.companyId.isNotBlank()) "$path?idCompany=${config.companyId}" else path
+
     suspend fun testConnection(): AlanubeStatus {
         if (config.jwtToken.isBlank()) return AlanubeStatus(false, error = "JWT token requerido")
         return runCatching {
-            val res = client.get("${getBaseUrl()}/company", config.jwtToken)
+            val res = client.get(urlWithCompany("${getBaseUrl()}/company"), config.jwtToken)
             if (!res.ok) {
                 return@runCatching AlanubeStatus(
                     false,
@@ -40,7 +43,7 @@ object AlanubeService {
     suspend fun getCompanyInfo(): AlanubeResult {
         if (config.jwtToken.isBlank()) return AlanubeResult(false, "JWT token requerido")
         return runCatching {
-            val res = client.get("${getBaseUrl()}/company", config.jwtToken)
+            val res = client.get(urlWithCompany("${getBaseUrl()}/company"), config.jwtToken)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Informacion obtenida" else "Error ${res.code}",
@@ -92,7 +95,7 @@ object AlanubeService {
         )
 
         return runCatching {
-            val res = client.post("${getBaseUrl()}/invoices", config.jwtToken, body)
+            val res = client.post(urlWithCompany("${getBaseUrl()}/invoices"), config.jwtToken, body)
             val docId = extractJsonValue(res.body, "id")
             val legalStatus = extractJsonValue(res.body, "legalStatus")
             AlanubeResult(
@@ -156,7 +159,7 @@ object AlanubeService {
         )
 
         return runCatching {
-            val res = client.post("${getBaseUrl()}/fiscal-invoices", config.jwtToken, body)
+            val res = client.post(urlWithCompany("${getBaseUrl()}/fiscal-invoices"), config.jwtToken, body)
             val docId = extractJsonValue(res.body, "id")
             val legalStatus = extractJsonValue(res.body, "legalStatus")
             AlanubeResult(
@@ -173,7 +176,7 @@ object AlanubeService {
     suspend fun checkDocumentStatus(documentId: String): AlanubeResult {
         if (config.jwtToken.isBlank()) return AlanubeResult(false, "JWT token requerido")
         return runCatching {
-            val res = client.get("${getBaseUrl()}/invoices/$documentId", config.jwtToken)
+            val res = client.get(urlWithCompany("${getBaseUrl()}/invoices/$documentId"), config.jwtToken)
             val legalStatus = extractJsonValue(res.body, "legalStatus")
             AlanubeResult(
                 success = res.ok,
@@ -189,7 +192,7 @@ object AlanubeService {
     suspend fun checkFiscalInvoiceStatus(documentId: String): AlanubeResult {
         if (config.jwtToken.isBlank()) return AlanubeResult(false, "JWT token requerido")
         return runCatching {
-            val res = client.get("${getBaseUrl()}/fiscal-invoices/$documentId", config.jwtToken)
+            val res = client.get(urlWithCompany("${getBaseUrl()}/fiscal-invoices/$documentId"), config.jwtToken)
             val legalStatus = extractJsonValue(res.body, "legalStatus")
             AlanubeResult(
                 success = res.ok,
@@ -243,7 +246,7 @@ object AlanubeService {
         )
 
         return runCatching {
-            val res = client.post("${getBaseUrl()}/gubernamental-invoices", config.jwtToken, body)
+            val res = client.post(urlWithCompany("${getBaseUrl()}/gubernamental-invoices"), config.jwtToken, body)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Factura gubernamental emitida" else "Error ${res.code}",
@@ -295,7 +298,7 @@ object AlanubeService {
         )
 
         return runCatching {
-            val res = client.post("${getBaseUrl()}/credit-notes", config.jwtToken, body)
+            val res = client.post(urlWithCompany("${getBaseUrl()}/credit-notes"), config.jwtToken, body)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Nota de credito emitida" else "Error ${res.code}",
@@ -347,7 +350,7 @@ object AlanubeService {
         )
 
         return runCatching {
-            val res = client.post("${getBaseUrl()}/debit-notes", config.jwtToken, body)
+            val res = client.post(urlWithCompany("${getBaseUrl()}/debit-notes"), config.jwtToken, body)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Nota de debito emitida" else "Error ${res.code}",
@@ -362,7 +365,7 @@ object AlanubeService {
     suspend fun checkDGIIHealth(): AlanubeResult {
         if (config.jwtToken.isBlank()) return AlanubeResult(false, "JWT token requerido")
         return runCatching {
-            val res = client.get("${getBaseUrl()}/dgii/status", config.jwtToken)
+            val res = client.get(urlWithCompany("${getBaseUrl()}/dgii/status"), config.jwtToken)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "DGII operativa" else "DGII no disponible",

@@ -1,9 +1,9 @@
 package com.tmrestaurant.cloud
 
 expect class CloudHttpClient() {
-    suspend fun get(path: String, bearerToken: String): CloudHttpResponse
-    suspend fun post(path: String, bearerToken: String, body: String): CloudHttpResponse
-    suspend fun put(path: String, bearerToken: String, body: String): CloudHttpResponse
+    suspend fun get(path: String, bearerToken: String, headers: Map<String, String> = emptyMap()): CloudHttpResponse
+    suspend fun post(path: String, bearerToken: String, body: String, headers: Map<String, String> = emptyMap()): CloudHttpResponse
+    suspend fun put(path: String, bearerToken: String, body: String, headers: Map<String, String> = emptyMap()): CloudHttpResponse
 }
 
 data class CloudHttpResponse(val code: Int, val body: String, val ok: Boolean = code in 200..299)

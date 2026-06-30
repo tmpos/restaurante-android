@@ -9,7 +9,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 actual class CloudHttpClient actual constructor() {
-    actual suspend fun get(path: String, bearerToken: String): CloudHttpResponse = withContext(Dispatchers.IO) {
+    actual suspend fun get(path: String, bearerToken: String, headers: Map<String, String>): CloudHttpResponse = withContext(Dispatchers.IO) {
         runCatching {
             val url = URL(path)
             val conn = url.openConnection() as HttpURLConnection
@@ -17,13 +17,14 @@ actual class CloudHttpClient actual constructor() {
             conn.setRequestProperty("Authorization", "Bearer $bearerToken")
             conn.setRequestProperty("apikey", bearerToken)
             conn.setRequestProperty("Accept", "application/json")
+            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             conn.connectTimeout = 10000
             conn.readTimeout = 10000
             readResponse(conn)
         }.getOrElse { CloudHttpResponse(-1, it.message ?: "Error de red", false) }
     }
 
-    actual suspend fun post(path: String, bearerToken: String, body: String): CloudHttpResponse = withContext(Dispatchers.IO) {
+    actual suspend fun post(path: String, bearerToken: String, body: String, headers: Map<String, String>): CloudHttpResponse = withContext(Dispatchers.IO) {
         runCatching {
             val url = URL(path)
             val conn = url.openConnection() as HttpURLConnection
@@ -31,6 +32,7 @@ actual class CloudHttpClient actual constructor() {
             conn.setRequestProperty("Authorization", "Bearer $bearerToken")
             conn.setRequestProperty("apikey", bearerToken)
             conn.setRequestProperty("Content-Type", "application/json")
+            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             conn.connectTimeout = 10000
             conn.readTimeout = 10000
             conn.doOutput = true
@@ -39,7 +41,7 @@ actual class CloudHttpClient actual constructor() {
         }.getOrElse { CloudHttpResponse(-1, it.message ?: "Error de red", false) }
     }
 
-    actual suspend fun put(path: String, bearerToken: String, body: String): CloudHttpResponse = withContext(Dispatchers.IO) {
+    actual suspend fun put(path: String, bearerToken: String, body: String, headers: Map<String, String>): CloudHttpResponse = withContext(Dispatchers.IO) {
         runCatching {
             val url = URL(path)
             val conn = url.openConnection() as HttpURLConnection
@@ -47,6 +49,7 @@ actual class CloudHttpClient actual constructor() {
             conn.setRequestProperty("Authorization", "Bearer $bearerToken")
             conn.setRequestProperty("apikey", bearerToken)
             conn.setRequestProperty("Content-Type", "application/json")
+            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             conn.connectTimeout = 10000
             conn.readTimeout = 10000
             conn.doOutput = true
