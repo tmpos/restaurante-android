@@ -1,0 +1,15 @@
+*.iml
+.gradle
+build/
+.idea
+local.properties
+.DS_Store
+*.db
+*.sqlite3
+*.zip
+/home
+/peripherals
+/.settings
+/.project
+aar-inspect/
+nul
