@@ -25,6 +25,9 @@ object AlanubeService {
     private fun urlWithCompany(path: String): String =
         if (config.companyId.isNotBlank()) "$path?idCompany=${config.companyId}" else path
 
+    private fun companyObj(): String =
+        if (config.companyId.isNotBlank()) "\"company\":{\"id\":\"${config.companyId}\"}," else ""
+
     suspend fun testConnection(): AlanubeStatus {
         if (config.jwtToken.isBlank()) return AlanubeStatus(false, error = "JWT token requerido")
         return runCatching {
@@ -83,22 +86,17 @@ object AlanubeService {
         )
 
         val itemsArray = if (items.isEmpty()) {
-            """[{"itemSequence":1,"itemDescription":"Venta POS","quantity":1,"unitOfMeasure":1,"unitPrice":$total,"totalAmount":$total}]"""
+            """[{"lineNumber":1,"itemName":"Venta POS","billingIndicator":1,"goodServiceIndicator":1,"quantityItem":1,"unitOfMeasure":1,"unitPriceItem":$total,"itemAmount":$total}]"""
         } else {
             items.mapIndexed { i, (desc, price) ->
-                """{"itemSequence":${i+1},"itemDescription":"${desc.replace("\"","\\\"")}","quantity":1,"unitOfMeasure":1,"unitPrice":$price,"totalAmount":$price}"""
+                """{"lineNumber":${i+1},"itemName":"${desc.replace("\"","\\\"")}","billingIndicator":1,"goodServiceIndicator":1,"quantityItem":1,"unitOfMeasure":1,"unitPriceItem":$price,"itemAmount":$price}"""
             }.joinToString(",", "[", "]")
         }
 
-        val body = buildJsonObject(
-            "idDoc" to idDocObj,
-            "sender" to senderObj,
-            "totals" to totalsObj,
-            "itemDetails" to itemsArray
-        )
+        val body = """{${companyObj()}"idDoc":$idDocObj,"sender":$senderObj,"totals":$totalsObj,"itemDetails":$itemsArray}"""
 
         return runCatching {
-            val res = client.post(urlWithCompany("${getBaseUrl()}/invoices"), config.jwtToken, body)
+            val res = client.post("${getBaseUrl()}/invoices", config.jwtToken, body)
             val docId = extractJsonValue(res.body, "id")
             val legalStatus = extractJsonValue(res.body, "legalStatus")
             AlanubeResult(
@@ -146,23 +144,17 @@ object AlanubeService {
         )
 
         val itemsArray = if (items.isEmpty()) {
-            """[{"itemSequence":1,"itemDescription":"Venta POS","quantity":1,"unitOfMeasure":1,"unitPrice":$total,"totalAmount":$total}]"""
+            """[{"lineNumber":1,"itemName":"Venta POS","billingIndicator":1,"goodServiceIndicator":1,"quantityItem":1,"unitOfMeasure":1,"unitPriceItem":$total,"itemAmount":$total}]"""
         } else {
             items.mapIndexed { i, (desc, price) ->
-                """{"itemSequence":${i+1},"itemDescription":"${desc.replace("\"","\\\"")}","quantity":1,"unitOfMeasure":1,"unitPrice":$price,"totalAmount":$price}"""
+                """{"lineNumber":${i+1},"itemName":"${desc.replace("\"","\\\"")}","billingIndicator":1,"goodServiceIndicator":1,"quantityItem":1,"unitOfMeasure":1,"unitPriceItem":$price,"itemAmount":$price}"""
             }.joinToString(",", "[", "]")
         }
 
-        val body = buildJsonObject(
-            "idDoc" to idDocObj,
-            "sender" to senderObj,
-            "buyer" to buyerObj,
-            "totals" to totalsObj,
-            "itemDetails" to itemsArray
-        )
+        val body = """{${companyObj()}"idDoc":$idDocObj,"sender":$senderObj,"buyer":$buyerObj,"totals":$totalsObj,"itemDetails":$itemsArray}"""
 
         return runCatching {
-            val res = client.post(urlWithCompany("${getBaseUrl()}/fiscal-invoices"), config.jwtToken, body)
+            val res = client.post("${getBaseUrl()}/fiscal-invoices", config.jwtToken, body)
             val docId = extractJsonValue(res.body, "id")
             val legalStatus = extractJsonValue(res.body, "legalStatus")
             AlanubeResult(
@@ -238,18 +230,12 @@ object AlanubeService {
 
         val totalsObj = buildJsonObject("totalAmount" to "$total")
 
-        val itemsArray = """[{"itemSequence":1,"itemDescription":"Venta","quantity":1,"unitOfMeasure":1,"unitPrice":$total,"totalAmount":$total}]"""
+        val itemsArray = """[{"lineNumber":1,"itemName":"Venta","billingIndicator":1,"goodServiceIndicator":1,"quantityItem":1,"unitOfMeasure":1,"unitPriceItem":$total,"itemAmount":$total}]"""
 
-        val body = buildJsonObject(
-            "idDoc" to idDocObj,
-            "sender" to senderObj,
-            "buyer" to buyerObj,
-            "totals" to totalsObj,
-            "itemDetails" to itemsArray
-        )
+        val body = """{${companyObj()}"idDoc":$idDocObj,"sender":$senderObj,"buyer":$buyerObj,"totals":$totalsObj,"itemDetails":$itemsArray}"""
 
         return runCatching {
-            val res = client.post(urlWithCompany("${getBaseUrl()}/gubernamental-invoices"), config.jwtToken, body)
+            val res = client.post("${getBaseUrl()}/gubernamental-invoices", config.jwtToken, body)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Factura gubernamental emitida" else "Error ${res.code}",
@@ -290,18 +276,12 @@ object AlanubeService {
 
         val totalsObj = buildJsonObject("totalAmount" to "$total")
 
-        val itemsArray = """[{"itemSequence":1,"itemDescription":"NC","quantity":1,"unitOfMeasure":1,"unitPrice":$total,"totalAmount":$total}]"""
+        val itemsArray = """[{"lineNumber":1,"itemName":"NC","billingIndicator":1,"goodServiceIndicator":1,"quantityItem":1,"unitOfMeasure":1,"unitPriceItem":$total,"itemAmount":$total}]"""
 
-        val body = buildJsonObject(
-            "idDoc" to idDocObj,
-            "sender" to senderObj,
-            "buyer" to buyerObj,
-            "totals" to totalsObj,
-            "itemDetails" to itemsArray
-        )
+        val body = """{${companyObj()}"idDoc":$idDocObj,"sender":$senderObj,"buyer":$buyerObj,"totals":$totalsObj,"itemDetails":$itemsArray}"""
 
         return runCatching {
-            val res = client.post(urlWithCompany("${getBaseUrl()}/credit-notes"), config.jwtToken, body)
+            val res = client.post("${getBaseUrl()}/credit-notes", config.jwtToken, body)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Nota de credito emitida" else "Error ${res.code}",
@@ -342,18 +322,12 @@ object AlanubeService {
 
         val totalsObj = buildJsonObject("totalAmount" to "$total")
 
-        val itemsArray = """[{"itemSequence":1,"itemDescription":"ND","quantity":1,"unitOfMeasure":1,"unitPrice":$total,"totalAmount":$total}]"""
+        val itemsArray = """[{"lineNumber":1,"itemName":"ND","billingIndicator":1,"goodServiceIndicator":1,"quantityItem":1,"unitOfMeasure":1,"unitPriceItem":$total,"itemAmount":$total}]"""
 
-        val body = buildJsonObject(
-            "idDoc" to idDocObj,
-            "sender" to senderObj,
-            "buyer" to buyerObj,
-            "totals" to totalsObj,
-            "itemDetails" to itemsArray
-        )
+        val body = """{${companyObj()}"idDoc":$idDocObj,"sender":$senderObj,"buyer":$buyerObj,"totals":$totalsObj,"itemDetails":$itemsArray}"""
 
         return runCatching {
-            val res = client.post(urlWithCompany("${getBaseUrl()}/debit-notes"), config.jwtToken, body)
+            val res = client.post("${getBaseUrl()}/debit-notes", config.jwtToken, body)
             AlanubeResult(
                 success = res.ok,
                 message = if (res.ok) "Nota de debito emitida" else "Error ${res.code}",
